@@ -1,0 +1,30 @@
+<div class="minesweeper" :class="{
+    win: gameState === GAME_STATE.WIN,
+    lose: gameState === GAME_STATE.LOSE
+}">
+    <h1>MineSweeper</h1>
+    <div class="controls">
+        <button @click="resetGame">New Game</button>
+        <div class="state win">WIN!</div>
+        <div class="state lose">LOSE...</div>
+    </div>
+
+    <div class="board" @contextmenu.prevent>
+        <div v-for="row in board" class="row">
+            <div v-for="cell in row" class="cell">
+                <span
+                      v-if="gameState === GAME_STATE.PLAY && cell.state < CELL_STATE.OPENED"
+                      @click="onCellClick(cell)"
+                      @contextmenu.prevent="toggleFlag(cell)"
+                      class="closed"
+                >
+                    {{cell.state === CELL_STATE.FLAGGED ? '🚩' : ''}}
+                </span>
+
+                <span v-else :class="`cell-${cell.value}`">
+                    {{cell.value && (cell.value === MINED_CELL ? '💣' : cell.value) || ''}}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
