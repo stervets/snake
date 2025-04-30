@@ -100,7 +100,6 @@ export default {
             let x = 0;
             while (this.preventEndlessResetCount++<100000 && (!x || this.bannedWall.includes(x))) {
                 x = random(4, BOARD_WIDTH - 4);
-                //debugger;
             }
             this.bannedWall.push(x, x + 1, x - 1, x + 2, x - 2);
             const holeLength = random(2, BOARD_HEIGHT - 4);
