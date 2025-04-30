@@ -1,6 +1,6 @@
 # 🐍 Snake Game
 
-A classic snake with CSS art, walls, and cute eyes. Built with love, runs via npm.
+A classic snake with  ~~pixel~~ CSS art, walls, and cute eyes. Built with love, runs via npm.
 
 ![Snake Cover](public/cover.png)
 
