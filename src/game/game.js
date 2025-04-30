@@ -155,11 +155,6 @@ export default {
             const snakeHead = this.snake.at(-1);
             Object.assign(snakeHead, this.getNextCoords(snakeHead, this.currentDirection));
 
-            if (this.snake.length >= SNAKE_WIN_LENGTH) {
-                this.gameState = GAME_STATE.WIN;
-                return;
-            }
-
             // check snake collision with walls and itself
             if (this.isCollided(snakeHead, this.snake.slice(0, -1), this.walls)) {
                 this.gameState = GAME_STATE.LOSE;
@@ -171,6 +166,10 @@ export default {
                 if (this.isCollided(snakeHead, this.apple)) {
                     this.apple = null;
                     this.snake.unshift(tail);
+                    if (this.snake.length >= SNAKE_WIN_LENGTH) {
+                        this.gameState = GAME_STATE.WIN;
+                        return;
+                    }
                 }
             } else {
                 this.createNewApple();
