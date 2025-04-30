@@ -1,115 +1,196 @@
 import {ref} from "vue";
 import {
-    BOARD_WIDTH,
     BOARD_HEIGHT,
-    VALIDATED_BOMBS_COUNT,
-    BOARD_SIZE,
-    CELL_STATE,
+    BOARD_WIDTH,
+    CELL_SIZE_PX, DIRECTION_MAP,
     GAME_STATE,
-    MINED_CELL
+    GAME_STEP_DELAY,
+    KEY,
+    SNAKE_START_LENGTH, SNAKE_WIN_LENGTH, WALLS_COUNT
 } from "./const";
-import {random} from "../utils";
+import {random, timeout} from "../utils";
 
 export default {
     setup() {
         return {
-            gameState: ref(GAME_STATE.PLAY), // ref - реактивная переменная
-            board: ref([]),
+            gameState: ref(null),
+            snake: ref([]),
+            apple: ref(null),
+            walls: ref([]),
+            currentDirection: ref(null),
 
-            openedCellsCount: 0, // счетчик открытых клеток (нужно для определения победы)
+            bannedWall: [],
+            preventEndlessResetCount: 0,
 
-            // нужно, чтобы константы были доступны в html
-            CELL_STATE,
             GAME_STATE,
-            MINED_CELL
+            BOARD_WIDTH,
+            BOARD_HEIGHT,
+            SNAKE_WIN_LENGTH,
+
+            getNextDirection: {
+                [KEY.LEFT]: () => ({x: -1, y: 0}),
+                [KEY.RIGHT]: () => ({x: 1, y: 0}),
+                [KEY.UP]: () => ({x: 0, y: -1}),
+                [KEY.DOWN]: () => ({x: 0, y: 1}),
+            }
         };
     },
 
-    // сработает как только приложение будет готово к исполнению
+    watch: {
+        gameState() {
+            this.gameState === GAME_STATE.PLAY && this.gameStep();
+        }
+    },
+
     created() {
         this.resetGame();
     },
 
+    mounted() {
+        document.documentElement.style.setProperty('--cell-size', `${CELL_SIZE_PX}px`);
+        document.body.addEventListener('keydown', this.onKeyDown)
+    },
+
+    beforeUnmount() {
+        document.body.removeEventListener('keydown', this.onKeyDown);
+    },
+
     methods: {
+        coordsToStyle(xy) {
+            return {
+                left: `${xy.x * CELL_SIZE_PX}px`,
+                top: `${xy.y * CELL_SIZE_PX}px`,
+                rotate: `${xy.angle}deg`
+            }
+        },
+
+        isCollided(colliders, ...targets) {
+            !Array.isArray(colliders) && (colliders = [colliders]);
+            return !!targets.flat().find((target) =>
+                colliders.find((collider) => collider.x === target.x && collider.y === target.y)
+            );
+        },
+
+        getNextCoords(current, nextDirection) {
+            const angle = ((current.angle % 360) + 360) % 360;
+            const direction = DIRECTION_MAP[angle];
+            //vector 2d cross
+            let cross = direction.x * nextDirection.y - direction.y * nextDirection.x;
+            return {
+                x: current.x + nextDirection.x,
+                y: current.y + nextDirection.y,
+                angle: current.angle + cross * 90
+            }
+        },
+
+        createNewApple() {
+            while (true) {
+                const apple = {
+                    x: random(1, BOARD_WIDTH - 2),
+                    y: random(1, BOARD_HEIGHT - 2)
+                };
+                if (!this.isCollided(apple, this.snake, this.walls)) {
+                    this.apple = apple;
+                    break;
+                }
+            }
+        },
+
+        createWall() {
+            let x = 0;
+            while (this.preventEndlessResetCount++<100000 && (!x || this.bannedWall.includes(x))) {
+                x = random(4, BOARD_WIDTH - 4);
+                //debugger;
+            }
+            this.bannedWall.push(x, x + 1, x - 1, x + 2, x - 2);
+            const holeLength = random(2, BOARD_HEIGHT - 4);
+            const holeStart = random(1, BOARD_HEIGHT - holeLength - 1);
+            const holeEnd = holeStart + holeLength - 1;
+            for (let y = 1; y < BOARD_HEIGHT - 1; y++) {
+                !(y >= holeStart && y <= holeEnd) && this.walls.push({x, y});
+            }
+        },
+
         resetGame() {
+            const snakeY = random(1, BOARD_HEIGHT - 2);
+            this.snake = Array.from({length: SNAKE_START_LENGTH}, (_, index) => ({
+                x: index + 1,
+                y: snakeY,
+                angle: 0
+            }));
+
+            this.walls = [];
+            this.bannedWall = [];
+
+            for (let i = 0; i < WALLS_COUNT; i++) {
+                this.createWall(i % 2);
+            }
+
+            if (this.preventEndlessResetCount++<100000 &&
+                this.isCollided(this.snake.concat({x: this.snake.length + 1, y: snakeY}), this.walls)) {
+                this.resetGame();
+                return;
+            }
+            this.preventEndlessResetCount = 0;
+
+            for (let x = 0; x < BOARD_WIDTH; x++) {
+                this.walls.push({x, y: 0}, {x, y: BOARD_HEIGHT - 1});
+            }
+
+            for (let y = 1; y < BOARD_HEIGHT - 1; y++) {
+                this.walls.push({x: 0, y}, {x: BOARD_WIDTH - 1, y});
+            }
+
+            this.apple = null;
+
+            this.currentDirection = this.getNextDirection[KEY.RIGHT]();
             this.gameState = GAME_STATE.PLAY;
-            this.openedCellsCount = 0;
-
-            this.board = [];
-            // первым делом формируем массив с клетками
-            for (let y = 0; y < BOARD_HEIGHT; y++) {
-                // создаём строку
-                this.board.push([]);
-                const row = this.board.at(-1);
-                for (let x = 0; x < BOARD_WIDTH; x++) {
-                    // создаём клетку
-                    row.push({
-                        x, y, // координаты клетки
-                        value: 0, // число окружающих бомб. 10 (MINED_CELL) означает, что в клетке бомба
-                        state: CELL_STATE.CLOSED // состояние клетки
-                    });
-                }
-            }
-
-            // расставляем бомбы
-            let bombsToPlace = VALIDATED_BOMBS_COUNT;
-            while (bombsToPlace > 0) {
-                const x = random(0, BOARD_WIDTH - 1);
-                const y = random(0, BOARD_HEIGHT - 1);
-                if (!this.board[y][x].value) {
-                    this.board[y][x].value = MINED_CELL;
-                    bombsToPlace--;
-                }
-            }
-
-            // ставим числа в клетки по количеству окружающих бомб
-            this.board.forEach((row) => {
-                row.forEach((cell) => {
-                    if (cell.value === MINED_CELL) return;
-                    for (let x = cell.x - 1; x <= cell.x + 1; x++) {
-                        for (let y = cell.y - 1; y <= cell.y + 1; y++) {
-                            this.board[y]?.[x]?.value === MINED_CELL && cell.value++;
-                        }
-                    }
-                });
-            });
         },
 
-        openCell(cell) {
-            cell.state = CELL_STATE.OPENED;
-            this.openedCellsCount++;
-        },
+        async gameStep() {
+            await timeout(GAME_STEP_DELAY);
+            const tail = {...this.snake[0]};
+            this.snake.slice(0, -1).forEach((item, index) =>
+                Object.assign(item, this.snake[index + 1])
+            );
+            const snakeHead = this.snake.at(-1);
+            Object.assign(snakeHead, this.getNextCoords(snakeHead, this.currentDirection));
 
-        // Обработчик клика по клетке
-        onCellClick(cell) {
-            // Если в клетке бомба, то завершаем игру (проигрыш)
-            if (cell.value === MINED_CELL) {
+            if (this.snake.length >= SNAKE_WIN_LENGTH) {
+                this.gameState = GAME_STATE.WIN;
+                return;
+            }
+
+            // check snake collision with walls and itself
+            if (this.isCollided(snakeHead, this.snake.slice(0, -1), this.walls)) {
                 this.gameState = GAME_STATE.LOSE;
                 return;
             }
 
-            this.openCell(cell); // открываем клетку
-
-            //если клетка пустая, то надо открыть окружающие клетки
-            if (!cell.value) {
-                for (let x = cell.x - 1; x <= cell.x + 1; x++) {
-                    for (let y = cell.y - 1; y <= cell.y + 1; y++) {
-                        const nextCell = this.board[y]?.[x];
-                        if (nextCell && nextCell.state < CELL_STATE.OPENED) {
-                            // Если клетка в окружении не пустая, то открываем её
-                            // Если клетка в окружении пустая, то надо открыть и её окружающие клетки
-                            nextCell.value ? this.openCell(nextCell) : this.onCellClick(nextCell);
-                        }
-                    }
+            if (this.apple) {
+                // check collision between snake head and apple
+                if (this.isCollided(snakeHead, this.apple)) {
+                    this.apple = null;
+                    this.snake.unshift(tail);
                 }
+            } else {
+                this.createNewApple();
             }
 
-            // Если открыты все клетки, кроме бомб, то завершаем игру (победа)
-            this.openedCellsCount >= BOARD_SIZE - VALIDATED_BOMBS_COUNT && (this.gameState = GAME_STATE.WIN);
+            this.gameState === GAME_STATE.PLAY && this.gameStep();
         },
 
-        toggleFlag(cell) {
-            cell.state = !cell.state * 1;
+        onKeyDown(e) {
+            if (this.gameState !== GAME_STATE.PLAY) return;
+            const nextDirection = this.getNextDirection[e.code]?.();
+            if (!nextDirection) return;
+            const snakeHead = this.snake.at(-1);
+
+            // check collision between snake head and prev snake segment
+            if (!this.isCollided(this.getNextCoords(snakeHead, nextDirection), this.snake.at(-2))) {
+                this.currentDirection = nextDirection;
+                snakeHead.angle = this.getNextCoords(snakeHead, nextDirection).angle;
+            }
         }
     }
 }

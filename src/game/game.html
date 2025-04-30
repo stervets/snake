@@ -1,30 +1,49 @@
-<div class="minesweeper" :class="{
+<div class="snake-game" :class="{
     win: gameState === GAME_STATE.WIN,
     lose: gameState === GAME_STATE.LOSE
 }">
-    <h1>MineSweeper</h1>
+    <h1>Snake</h1>
     <div class="controls">
         <button @click="resetGame">New Game</button>
         <div class="state win">WIN!</div>
         <div class="state lose">LOSE...</div>
+        <div>Snake length: {{ snake.length }}/{{ SNAKE_WIN_LENGTH }}</div>
     </div>
 
-    <div class="board" @contextmenu.prevent>
-        <div v-for="row in board" class="row">
-            <div v-for="cell in row" class="cell">
-                <span
-                      v-if="gameState === GAME_STATE.PLAY && cell.state < CELL_STATE.OPENED"
-                      @click="onCellClick(cell)"
-                      @contextmenu.prevent="toggleFlag(cell)"
-                      class="closed"
-                >
-                    {{cell.state === CELL_STATE.FLAGGED ? '🚩' : ''}}
-                </span>
-
-                <span v-else :class="`cell-${cell.value}`">
-                    {{cell.value && (cell.value === MINED_CELL ? '💣' : cell.value) || ''}}
-                </span>
-            </div>
+    <div class="board" :style="{
+        width: coordsToStyle({x: BOARD_WIDTH}).left,
+        height: coordsToStyle({y: BOARD_HEIGHT}).top
+    }">
+        <div class="background">
+            <div class="cells"></div>
         </div>
+        <div v-for="wall in walls"
+             class="wall"
+             :style="coordsToStyle(wall)">
+            🧱
+        </div>
+
+        <transition name="fade">
+            <div class="apple" v-if="apple" :style="coordsToStyle(apple)">🍏</div>
+        </transition>
+
+        <template v-for="(snakeItem, index) in snake.slice().reverse()">
+            <div class="snake-item"
+                 :class="[`snake-dir-${snakeItem.dir}`, {
+                 first: !index,
+                 last: index + 1 >= snake.length,
+                 raised: (snakeItem.x + snakeItem.y) % 2
+             }]"
+                 :style="{...coordsToStyle(snakeItem), zIndex: snake.length-index}">
+                <div :class="{raised: (snakeItem.x + snakeItem.y) % 2 }"/>
+            </div>
+        </template>
+        <transition name="fade-blow">
+            <div class="bang"
+                 v-if="gameState === GAME_STATE.LOSE"
+                 :style="{...coordsToStyle(snake.at(-1)), zIndex: snake.length+1}">
+                💥
+            </div>
+        </transition>
     </div>
 </div>
