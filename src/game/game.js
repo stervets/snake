@@ -35,6 +35,7 @@ export default {
             },
 
             path: shallowRef([]),
+            closed: shallowRef([]),
             foundPathToApple: true
         };
     },
@@ -151,34 +152,33 @@ export default {
 
         },
 
-        findPath(targetCell) {
+        findPath(targetCell, foundPathToApple = true) {
             const snakeHead = this.snake.at(-1);
 
             const closed = [...this.walls, ...this.snake];
             const open = [];
 
-            const isOpen = (cell) => !closed.some(c => cell.x === c.x && cell.y === c.y);
-            const distance = (a, b) => Math.floor(((a.x - b.x) ** 2 + (a.y - b.y) ** 2) / 1);
+            const getClosedCell = (cell, array) => array.find(c => cell.x === c.x && cell.y === c.y);
+            const distance = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 
             const appendOpenCellsAround = (cell) => {
-                const cells = [];
-                let nextCell;
-                Object.values(KEY).forEach(key =>
-                        isOpen(nextCell = this.getNextCoords(cell, this.getNextDirection[key]())) && cells.push({
-                            ...nextCell,
-                            distance: distance(nextCell, targetCell),
-                            headDistance: distance(nextCell, snakeHead),
-                            parent: cell
-                        })
-                );
-                cells.sort((a, b) => b.distance - a.distance);
-                open.push.apply(open, cells);
+                Object.values(KEY).forEach(key => {
+                    const nextCell = this.getNextCoords(cell, this.getNextDirection[key]())
+                    !getClosedCell(nextCell, closed.concat(open)) && open.push({
+                        ...nextCell,
+                        distance: distance(nextCell, targetCell),
+                        headDistance: distance(nextCell, snakeHead),
+                        parent: cell
+                    });
+                });
             }
 
             appendOpenCellsAround(snakeHead);
             if (!open.slice().pop()) return [];
             while (open.length) {
+                open.sort((a, b) => b.distance - a.distance);
                 let cell = open.pop();
+                closed.push(cell);
                 if (cell.x === targetCell.x && cell.y === targetCell.y) {
                     const path = [];
                     while (cell) {
@@ -188,7 +188,6 @@ export default {
                     path.pop();
                     return path;
                 }
-                closed.push(cell);
                 appendOpenCellsAround(cell);
             }
 
@@ -213,10 +212,11 @@ export default {
 
         async gameStep() {
             await timeout(GAME_STEP_DELAY);
-            if (!this.apple) {
-                this.createNewApple();
-                this.path = [];
-            }
+            !this.apple && this.createNewApple();
+
+            this.path = this.findPath(this.apple);
+            const nextCell = this.path.pop();
+            nextCell && this.setNextSnakeMove(nextCell);
 
             const tail = {...this.snake[0]};
             this.snake.slice(0, -1).forEach((item, index) =>
@@ -231,14 +231,6 @@ export default {
                 return;
             }
 
-            //const path = this.findPath(this.apple);
-            if (!this.path.length) {
-                //this.path = path.slice(-10);
-                this.path = this.findPath(this.apple);
-            }
-            const nextCell = this.path.pop();
-            nextCell && this.setNextSnakeMove(nextCell);
-
             // check collision between snake head and apple
             if (this.isCollided(snakeHead, this.apple)) {
                 this.apple = null;
@@ -248,7 +240,6 @@ export default {
                     return;
                 }
             }
-
 
             this.gameState === GAME_STATE.PLAY && this.gameStep();
         },
