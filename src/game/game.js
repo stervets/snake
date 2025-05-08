@@ -212,12 +212,15 @@ export default {
         },
 
         async gameStep() {
-            await timeout(GAME_STEP_DELAY);
             !this.apple && this.createNewApple();
+            this.path = this.findPath(this.apple);
+
+            await timeout(GAME_STEP_DELAY);
 
             //!(this.path.length) && (this.path = this.findPath(this.apple));
             //const nextCell = this.path.pop();
-            const nextCell = this.findPath(this.apple).pop();
+
+            const nextCell = this.path.pop();
             nextCell && this.setNextSnakeMove(nextCell);
 
             const tail = {...this.snake[0]};
