@@ -181,6 +181,7 @@ export default {
                 let cell = open.pop();
                 closed.push(cell);
                 if (cell.x === targetCell.x && cell.y === targetCell.y) {
+                    this.closed = closed.slice(this.walls.length + this.snake.length);
                     const path = [];
                     while (cell) {
                         path.push(cell);
