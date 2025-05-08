@@ -3,7 +3,7 @@ export const CELL_SIZE_PX = 30;
 export const BOARD_WIDTH = 20;
 export const BOARD_HEIGHT = 15;
 export const SNAKE_START_LENGTH = 3;
-export const SNAKE_WIN_LENGTH = 40;
+export const SNAKE_WIN_LENGTH = 30;
 export const GAME_STEP_DELAY = 150;
 export const WALLS_COUNT = 3; //Careful with that! May lead to impassable levels
 ////////////////////////////////////

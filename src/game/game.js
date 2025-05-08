@@ -159,6 +159,7 @@ export default {
             const open = [];
 
             const getClosedCell = (cell, array) => array.find(c => cell.x === c.x && cell.y === c.y);
+            //const distance = (a, b) => Math.round(((a.x - b.x) ** 2 + (a.y - b.y) ** 2)/2);
             const distance = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
 
             const appendOpenCellsAround = (cell) => {
@@ -214,8 +215,9 @@ export default {
             await timeout(GAME_STEP_DELAY);
             !this.apple && this.createNewApple();
 
-            this.path = this.findPath(this.apple);
-            const nextCell = this.path.pop();
+            //!(this.path.length) && (this.path = this.findPath(this.apple));
+            //const nextCell = this.path.pop();
+            const nextCell = this.findPath(this.apple).pop();
             nextCell && this.setNextSnakeMove(nextCell);
 
             const tail = {...this.snake[0]};
